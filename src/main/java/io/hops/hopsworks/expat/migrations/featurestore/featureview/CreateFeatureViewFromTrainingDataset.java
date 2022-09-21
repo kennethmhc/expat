@@ -60,7 +60,7 @@ public class CreateFeatureViewFromTrainingDataset extends FeatureStoreMigration 
           "INNER JOIN feature_group AS fg ON tdf.feature_group = fg.id " +
           "WHERE %s";
 
-  private final static String GET_ARRAY_FROM_TD = "SELECT a.id FROM %s AS a WHERE a.training_dataset = %s";
+  private final static String GET_ARRAY_FROM_TD = "SELECT a.id FROM %s AS a WHERE a.%s = %s";
   private final static String SET_FEATURE_VIEW = "UPDATE %s SET feature_view_id = ? WHERE %s = ?";
   private final static String REMOVE_FEATURE_VIEW_FROM_TABLES = "UPDATE %s SET %s = null WHERE %s = ?";
   private final static String DELETE_FEATURE_VIEW = "DELETE FROM feature_view WHERE id = ?";
@@ -110,7 +110,9 @@ public class CreateFeatureViewFromTrainingDataset extends FeatureStoreMigration 
         String userName = trainingDatasets.getString("username");
         String email = trainingDatasets.getString("email");
 
-        Integer[] features = getArray("training_dataset_feature", trainingDatasetId);
+        Integer[] features = getArray(
+            "training_dataset_feature", "training_dataset", trainingDatasetId
+        );
 
         insertFeatureViewStatement.setString(1, name);
         insertFeatureViewStatement.setInt(2, featurestoreId);
@@ -236,7 +238,7 @@ public class CreateFeatureViewFromTrainingDataset extends FeatureStoreMigration 
     }
   }
 
-  private void setXAttr(Integer featurestoreId, String featureViewFullPath, String description,
+  byte[] setXAttr(Integer featurestoreId, String featureViewFullPath, String description,
       Date createDate, String email, Integer[] features)
       throws MigrationException {
     try {
@@ -264,6 +266,7 @@ public class CreateFeatureViewFromTrainingDataset extends FeatureStoreMigration 
         XAttrHelper.upsertProvXAttr(dfso, featureViewFullPath,
             FeaturestoreXAttrsConstants.FEATURESTORE, val);
       }
+      return val;
     } catch (JAXBException | XAttrException e) {
       throw new MigrationException("Cannot set attribute.", e);
     }
@@ -351,7 +354,7 @@ public class CreateFeatureViewFromTrainingDataset extends FeatureStoreMigration 
     return new Path(String.format(PATH_TO_FEATURE_VIEW, projectName, projectName));
   }
 
-  private Path getFeatureViewFullPath(String projectName, String featureViewName, Integer featureViewVersion) {
+  Path getFeatureViewFullPath(String projectName, String featureViewName, Integer featureViewVersion) {
     return new Path(getFeatureViewPath(projectName),
         featureViewName + "_" + featureViewVersion);
   }
@@ -370,8 +373,8 @@ public class CreateFeatureViewFromTrainingDataset extends FeatureStoreMigration 
     }
   }
 
-  private Integer[] getArray(String tableName, Integer trainingDatasetId) throws MigrationException {
-    String sql = String.format(GET_ARRAY_FROM_TD, tableName, trainingDatasetId);
+  Integer[] getArray(String tableName, String fieldName, Integer id) throws MigrationException {
+    String sql = String.format(GET_ARRAY_FROM_TD, tableName, fieldName, id);
     try {
       PreparedStatement getFeaturesStatement = connection.prepareStatement(sql);
       ResultSet results = getFeaturesStatement.executeQuery();
